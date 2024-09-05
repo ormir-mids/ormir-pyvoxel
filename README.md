@@ -6,6 +6,9 @@
 
 [Documentation](http://pyvoxel.readthedocs.io/) | [Installation](https://pyvoxel.readthedocs.io/en/latest/introduction.html) | [Basic Usage](https://pyvoxel.readthedocs.io/en/latest/user_guide.html)
 
+***This is a fork of the original pyvoxel from Arjun Desai. The original repository can be found [here](https://github.com/pyvoxel/pyvoxel).
+This repository is maintained by [ORMIR](https://ormim.org).***
+
 Voxel provides fast Pythonic data structures and tools for wrangling with medical images.
 
 ## Installation
@@ -14,7 +17,7 @@ Voxel requires Python 3.7+. The core module depends on numpy, nibabel, pydicom, 
 To install Voxel, run:
 
 ```bash
-pip install pyvoxel
+pip install ormir-pyvoxel
 ```
 
 ## Features

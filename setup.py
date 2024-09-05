@@ -137,12 +137,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 
 setup(
-    name="pyvoxel",
+    name="ormir-pyvoxel",
     version=get_version(),
-    author="Arjun Desai",
-    url="https://github.com/pyvoxel/pyvoxel",
+    author="Arjun Desai, Francesco Santini, ORMIR Contributors",
+    url="https://github.com/ormir-mids/ormir-pyvoxel",
     project_urls={"Documentation": "https://pyvoxel.readthedocs.io/"},
-    description="An AI-powered open-source medical image analysis toolbox",
+    description="I/O routines for medical imaging data",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=("configs", "tests", "tests.*")),
