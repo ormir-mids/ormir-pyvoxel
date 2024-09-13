@@ -96,7 +96,7 @@ REQUIRED = [
     "natsort",
     "nibabel",
     "packaging",
-    "pydicom>=1.6.0",
+    "pydicom>=2.2.0",
     "PyYAML>=5.4.1",
     "requests",
     "tabulate",
