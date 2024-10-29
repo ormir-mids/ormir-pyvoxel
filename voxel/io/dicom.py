@@ -59,7 +59,7 @@ def _separate_enhanced_slices(data_in):
 
     try:
         d.decompress()
-    except NotImplementedError:
+    except (NotImplementedError, ValueError):
         pass
 
     pixel_data = d.pixel_array.astype(np.uint16)
@@ -196,7 +196,7 @@ class DicomReader(DataReader):
         assert isinstance(include, tuple)
         assert isinstance(exclude, tuple)
         if ignore_hidden:
-            exclude += ("^\.",)  # noqa: W605
+            exclude += (r"^\.",)
 
         possible_files = os.listdir(path)
         lst_files_dicom = []
@@ -350,11 +350,6 @@ class DicomReader(DataReader):
                 new_dicom_slices.append(dataset)
 
         dicom_slices = new_dicom_slices
-
-        print(
-            "----------------------------------------------- FFFFFFFFFFFFF --------------------------------"
-        )
-        print(len(dicom_slices))
 
         if sort_by:
             try:
