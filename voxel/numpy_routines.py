@@ -161,7 +161,7 @@ def nan_to_num(x, copy=True, nan=0.0, posinf=None, neginf=None):
         return x._partial_clone(volume=vol)
 
 
-@implements(np.around, np.round, np.round_)
+@implements(np.around, np.round)
 def around(x, decimals=0, affine=False):
     """Round medical image pixel data (and optionally affine) to the given number of decimals.
 
