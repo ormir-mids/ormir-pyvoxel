@@ -85,9 +85,13 @@ def _separate_enhanced_slices(data_in):
 def _safe_dicom_read(file_path, force=True):
     """Read a dicom file without crashing if a non-dicom file is encountered."""
     try:
-        return pydicom.dcmread(file_path, force=force)
+        d = pydicom.dcmread(file_path, force=force)
     except pydicom.errors.InvalidDicomError:
         return None
+    #check if valid dicom
+    if 'SOPInstanceUID' in d:
+        return d
+    return None
 
 
 class DicomReader(DataReader):
