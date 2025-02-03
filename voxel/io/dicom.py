@@ -38,8 +38,8 @@ def _flatten_data(d, new_dataset=None):
     """Flatten a pydicom dataset into a single level dictionary."""
     if new_dataset is None:
         new_dataset = pydicom.Dataset()
-        new_dataset.is_little_endian = d.is_little_endian
-        new_dataset.is_implicit_VR = d.is_implicit_VR
+        #new_dataset.is_little_endian = d.is_little_endian
+        #new_dataset.is_implicit_VR = d.is_implicit_VR
         new_dataset.file_meta = copy.deepcopy(d.file_meta)
         new_dataset.file_meta.MediaStorageSOPClassUID = (
             "1.2.840.10008.5.1.4.1.1.4"  # non-enhanced ClassUID
