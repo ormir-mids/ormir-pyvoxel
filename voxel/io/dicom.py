@@ -76,7 +76,7 @@ def _separate_enhanced_slices(data_in):
         new_slice_header = _flatten_data(d)
         _flatten_data(slice_header, new_slice_header)
         new_slice_header.NumberOfFrames = 1
-        new_slice_header.PixelData = pixel_data[:, :, current_slice].tostring()
+        new_slice_header.PixelData = pixel_data[:, :, current_slice].tobytes()
         header_list.append(new_slice_header)
         current_slice += 1
     return header_list
