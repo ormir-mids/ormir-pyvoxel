@@ -38,8 +38,8 @@ def _flatten_data(d, new_dataset=None):
     """Flatten a pydicom dataset into a single level dictionary."""
     if new_dataset is None:
         new_dataset = pydicom.Dataset()
-        #new_dataset.is_little_endian = d.is_little_endian
-        #new_dataset.is_implicit_VR = d.is_implicit_VR
+        # new_dataset.is_little_endian = d.is_little_endian
+        # new_dataset.is_implicit_VR = d.is_implicit_VR
         new_dataset.file_meta = copy.deepcopy(d.file_meta)
         new_dataset.file_meta.MediaStorageSOPClassUID = (
             "1.2.840.10008.5.1.4.1.1.4"  # non-enhanced ClassUID
@@ -88,7 +88,7 @@ def _safe_dicom_read(file_path, force=True):
         d = pydicom.dcmread(file_path, force=force)
     except pydicom.errors.InvalidDicomError:
         return None
-    #check if valid dicom
+    # check if valid dicom
     if 'SOPInstanceUID' in d:
         return d
     return None
@@ -802,7 +802,7 @@ def add_dicom_headers(
         """Generates a little endian formatted file meta info."""
         file_meta = pydicom.dataset.FileMetaDataset()
         file_meta.MediaStorageSOPClassUID = pydicom.uid.UID("1.2.840.10008.5.1.4.1.1.4")
-        file_meta.MediaStorageSOPInstanceUID = pydicom.uid.UID(f"{shared_uid}.{sl+1}")
+        file_meta.MediaStorageSOPInstanceUID = pydicom.uid.UID(f"{shared_uid}.{sl + 1}")
         file_meta.ImplementationClassUID = pydicom.uid.UID("1.2.840.113619.6.374")
         file_meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
         # file_meta.SOPInstanceUID = pydicom.uid.generate_uid()

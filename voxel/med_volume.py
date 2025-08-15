@@ -304,6 +304,35 @@ class MedicalVolume(NDArrayOperatorsMixin):
         """
         return self.reformat(other.orientation, inplace=inplace)
 
+    def realign_as(self, other, interpolation_order: int = 3, inplace: bool = False) -> "MedicalVolume":
+        """Realign this volume to the image space of another volume.
+
+        Similar to ``reformat_as``, except that it supports fine rotations, translations,
+        and shape changes, so that the affine matrix and extent of the modified volume
+        is identical to the one of the target.
+
+        Args:
+            other (MedicalVolume): The target volume to realign to.
+            interpolation_order (int, optional): Spline interpolation order. Defaults to 3.
+            inplace (bool, optional): If `True`, do operation in-place and return ``self``.
+
+        Returns:
+            MedicalVolume: The realigned volume.
+        """
+        from .utils import realign_medical_volume
+
+        new_mv = realign_medical_volume(self, other, interpolation_order)
+
+        if inplace:
+            self._affine = new_mv.affine
+            self._volume = new_mv.volume
+            self._headers = new_mv.headers
+            mv = self
+        else:
+            mv = new_mv
+
+        return mv
+
     def is_identical(self, mv):
         """Check if another medical volume is identical.
 

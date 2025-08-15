@@ -115,6 +115,10 @@ EXTRAS = {
         "twine",
     ],
     "docs": ["mistune>=0.8.1,<2.0.0", "sphinx", "sphinxcontrib.bibtex", "m2r2"],
+    "optional": [
+        # optional dependency libraries.
+        "scipy"
+    ]
 }
 
 with open("README.md", "r", encoding="utf-8") as fh:
