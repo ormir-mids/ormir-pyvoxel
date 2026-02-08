@@ -330,7 +330,7 @@ class DicomReader(DataReader):
             ]
 
         # remove the failed files from the list
-        dicom_slices = list(filter(lambda x: x is not None, dicom_slices))
+        dicom_slices = list(filter(lambda x: x is not None and hasattr(x, 'pixel_array'), dicom_slices))
 
         # check if the dicom dataset is enhanced
         new_dicom_slices = []
