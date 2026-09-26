@@ -266,6 +266,9 @@ class DicomReader(DataReader):
         are ignored. Files are initially sorted in alphabetical order and subsequently by
         ``sort_by`` if specified.
 
+        If a series contain slices with different Image Orientation Patient, then the series will be split into
+        multiple volumes.
+
         Args:
             path_or_bytes (`str(s)`): Directory with dicom files or dicom file(s).
                 Dicom file(s) can either be the path or the bytes from the opened file.
@@ -382,14 +385,58 @@ class DicomReader(DataReader):
             headers = dd["headers"]
             if len(headers) == 0:
                 continue
-            arr = np.stack(dd["arr"], axis=-1)
 
-            affine = stdo.to_RAS_affine(headers, default_ornt=default_ornt)
+            # Split series on image orientation patient which can be different for series acuired using multiple angles.
+            orientation_groups = {}
+            for header, arr_slice in zip(headers, dd["arr"]):
+                try:
+                    orientation = _unpack_dicom_attr(header, "ImageOrientationPatient", required=False)
+                    if orientation is None:
+                        # If ImageOrientationPatient is missing, use a default key
+                        orientation = None
+                    else:
+                        # Convert to tuple for hashability
+                        if hasattr(orientation, '__iter__') and not isinstance(orientation, str):
+                            orientation = tuple(float(x) for x in orientation)
+                        elif isinstance(orientation, (int, float)):
+                            orientation = (orientation,)
+                        else:
+                            orientation = (orientation,)
+                except (KeyError, TypeError, AttributeError):
+                    # Fallback if ImageOrientationPatient is missing
+                    orientation = None
 
-            vol = MedicalVolume(arr, affine, headers=headers)
-            vols.append(vol)
+                if orientation not in orientation_groups:
+                    orientation_groups[orientation] = {"headers": [], "arr": []}
 
-        return vols if len(group_by) > 0 else vols[0]
+                orientation_groups[orientation]["headers"].append(header)
+                orientation_groups[orientation]["arr"].append(arr_slice)
+
+            # Create a volume for each orientation group
+            for orientation_key in sorted(orientation_groups.keys()):
+                orientation_dd = orientation_groups[orientation_key]
+                orientation_headers = orientation_dd["headers"]
+                if len(orientation_headers) == 0:
+                    continue
+
+                arr = np.stack(orientation_dd["arr"], axis=-1)
+                affine = stdo.to_RAS_affine(orientation_headers, default_ornt=default_ornt)
+                vol = MedicalVolume(arr, affine, headers=orientation_headers)
+                vols.append(vol)
+
+        # Return logic:
+        # - If group_by was specified (len > 0), always return list of volumes
+        # - If group_by was not specified (len == 0), return list only if we have multiple volumes
+        #   (i.e., if orientations differ), otherwise return single volume for backward compatibility
+        if len(group_by) > 0:
+            return vols
+        else:
+            # No group_by specified, check if we have multiple volumes due to orientation splitting
+            if len(vols) > 1:
+                return vols
+            else:
+                # Only one volume, return it directly for backward compatibility
+                return vols[0] if vols else None
 
     def __serializable_variables__(self) -> Collection[str]:
         return self.__dict__.keys()
