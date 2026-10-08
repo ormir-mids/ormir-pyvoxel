@@ -368,7 +368,7 @@ class DicomReader(DataReader):
 
         dicom_data = {}
         for ds in dicom_slices:
-            val_groupby = tuple(_unpack_dicom_attr(ds, attr, required=True) for attr in group_by)
+            val_groupby = tuple(_wrap_as_tuple(_unpack_dicom_attr(ds, attr, required=True)) for attr in group_by)
 
             if val_groupby not in dicom_data.keys():
                 dicom_data[val_groupby] = {"headers": [], "arr": []}
