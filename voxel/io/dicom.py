@@ -413,7 +413,7 @@ class DicomReader(DataReader):
                 orientation_groups[orientation]["arr"].append(arr_slice)
 
             # Create a volume for each orientation group
-            for orientation_key in sorted(orientation_groups.keys()):
+            for orientation_key in sorted(orientation_groups.keys(), key=lambda orientation: (orientation is None, orientation)):
                 orientation_dd = orientation_groups[orientation_key]
                 orientation_headers = orientation_dd["headers"]
                 if len(orientation_headers) == 0:
