@@ -875,12 +875,41 @@ class MedicalVolume(NDArrayOperatorsMixin):
         mv = self if inplace else self.clone()
         mv = mv.astype(np.dtype(dtype), copy=False)
 
-        h: pydicom.Dataset = self._headers.flat[0]
-        rs = float(h.get("RescaleSlope", 1)) if slope is None else slope
-        ri = float(h.get("RescaleIntercept", 0)) if intercept is None else intercept
-        apply_rescale(mv._volume, rs, ri, inplace=True)
+        if mv._headers is None:
+            apply_rescale(mv._volume, slope, intercept, inplace=True)
+        else:
+            # Headers are aligned with the volume and may have singleton
+            # dimensions for axes shared by multiple pixels.
+            headers = mv._headers
 
-        if sync:
+            headers = mv._headers
+
+            if headers.ndim > mv._volume.ndim:
+                raise ValueError("Headers have more dimensions than the volume")
+
+            header_shape = headers.shape + (1,) * (mv._volume.ndim - headers.ndim)
+
+            if any(h != 1 and h != v for h, v in zip(header_shape, mv._volume.shape)):
+                raise ValueError(
+                    "Header dimensions must be singleton or match "
+                    "the corresponding volume dimensions"
+                )
+
+            for index in np.ndindex(headers.shape):
+                h: pydicom.Dataset = headers[index]
+                rs = float(h.get("RescaleSlope", 1)) if slope is None else slope
+                ri = float(h.get("RescaleIntercept", 0)) if intercept is None else intercept
+
+                # Use slices rather than integer indices so the selected
+                # region remains a writable view of the original array.
+                region = tuple(
+                    slice(None) if size == 1 else slice(i, i + 1)
+                    for i, size in zip(index, headers.shape)
+                )
+                region += (slice(None),) * (mv._volume.ndim - len(region))
+                apply_rescale(mv._volume[region], rs, ri, inplace=True)
+
+        if sync and mv._headers is not None:
             mv._delete_metadata("RescaleSlope")
             mv._delete_metadata("RescaleIntercept")
 
