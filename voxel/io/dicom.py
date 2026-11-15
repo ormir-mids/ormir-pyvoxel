@@ -830,6 +830,9 @@ def add_dicom_headers(
                 print(f"Failed to set {k} to {v}: {e}")
                 raise e
 
+        header.SOPClassUID = header.file_meta.MediaStorageSOPClassUID
+        header.SOPInstanceUID = header.file_meta.MediaStorageSOPInstanceUID
+
         header.is_little_endian = True
         header.is_implicit_VR = False
 
@@ -890,7 +893,7 @@ def _get_per_slice_metadata(affine, num_slices: int) -> List[Dict[str, Any]]:
             if isinstance(v, np.ndarray):
                 v = v.flatten()
             if isinstance(v, (np.ndarray, list, tuple)):
-                dtype = int if v[0].dtype in (np.int, np.int16, np.int32, np.int64) else float
+                dtype = int if v[0].dtype in (int, np.int16, np.int32, np.int64) else float
                 md[k] = [dtype(x) for x in v]
 
     return metadatas

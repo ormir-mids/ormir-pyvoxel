@@ -53,7 +53,7 @@ class TestHttpIO(unittest.TestCase):
             assert mv.is_identical(mv_nifti2)
 
             # Ambiguous file extension
-            with self.assertRaises(AttributeError):
+            with self.assertRaises(IndexError):
                 hr.load(f"{base_url}/test")
 
             with self.assertRaises(ValueError):

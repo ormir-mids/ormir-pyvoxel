@@ -480,7 +480,7 @@ class TestMedicalVolume(unittest.TestCase):
 
     def test_hdf5(self):
         shape = (10, 20, 30)
-        volume = np.reshape(list(range(np.product(shape))), shape)
+        volume = np.reshape(list(range(np.prod(shape))), shape)
         hdf5_file = os.path.join(self._TEMP_PATH, "unittest.h5")
 
         with h5py.File(hdf5_file, "w") as f:
@@ -683,7 +683,7 @@ class TestMedicalVolume(unittest.TestCase):
         assert torch.all(tensor == torch.from_numpy(vol))
         assert tensor.shape == mv.shape
 
-        vol = np.ones((10, 20, 30), np.complex)
+        vol = np.ones((10, 20, 30), complex)
         mv = MedicalVolume(vol, self._AFFINE)
 
         tensor = mv.to_torch()
