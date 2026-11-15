@@ -100,12 +100,17 @@ EXTRAS = {
         "h5py",
         # formatting.
         "coverage",
-        "flake8",
-        "flake8-bugbear",
-        "flake8-comprehensions",
-        "isort",
-        "black==22.8.0",
-        "click==8.0.2",
+        "flake8==7.5.0; python_version >= '3.11'",
+        "flake8; python_version < '3.11'",
+        "flake8-bugbear==26.11.9; python_version >= '3.11'",
+        "flake8-bugbear; python_version < '3.11'",
+        "flake8-comprehensions==3.17.0; python_version >= '3.11'",
+        "flake8-comprehensions; python_version < '3.11'",
+        "isort==9.0.2; python_version >= '3.11'",
+        "isort; python_version < '3.11'",
+        "black==26.10.1; python_version >= '3.11'",
+        "black==22.8.0; python_version < '3.11'",
+        "click==8.0.2; python_version < '3.11'",
         # testing.
         "pytest-cov>=2.10.1",
         "pre-commit>=2.9.3",
@@ -118,7 +123,7 @@ EXTRAS = {
     "optional": [
         # optional dependency libraries.
         "scipy"
-    ]
+    ],
 }
 
 with open("README.md", "r", encoding="utf-8") as fh:
