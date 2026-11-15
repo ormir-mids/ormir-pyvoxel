@@ -1,4 +1,5 @@
 """List of numpy functions supported for MedicalVolumes."""
+
 import warnings
 from typing import Sequence, Union
 
@@ -372,7 +373,8 @@ def concatenate(xs, axis: int = -1):
             warnings.warn(
                 "Got invalid headers shape ({}) given concatenated output shape ({}). "
                 "Expected header dimensions to be 1 or same as volume dimension for all axes. "
-                "Dropping all headers in concatenated output.".format(volume.shape, headers.shape)
+                "Dropping all headers in concatenated output.".format(volume.shape, headers.shape),
+                stacklevel=1,
             )
             headers = None
 

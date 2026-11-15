@@ -3,11 +3,15 @@ import numpy as np
 try:
     from scipy.ndimage import map_coordinates
 except ImportError:
+
     def realign_medical_volume(*args, **kwargs):
         """Placeholder function to raise ImportError if scipy is not installed."""
         raise ImportError(
-            "scipy is required for realigning medical volumes. Please install it with 'pip install scipy'.")
+            "scipy is required for realigning medical volumes. Please install it with 'pip install scipy'."
+        )
+
 else:
+
     def realign_medical_volume(source, destination, interpolation_order: int = 3):
         """Realign this volume to the image space of another volume. Similar to ``reformat_as``,
         except that it supports fine rotations, translations and shape changes, so that the affine
@@ -40,14 +44,16 @@ else:
                 realigned_i = realign_medical_volume(
                     MedicalVolume(source_i, source.affine, []),
                     destination,
-                    interpolation_order=interpolation_order
+                    interpolation_order=interpolation_order,
                 )
                 realigned[..., i] = realigned_i.volume
             headers_new = target.headers()
             if headers_new is not None:
                 if len(headers_new) != source_flattened.shape[2] * source_flattened.shape[3]:
                     # the destination is a lower dimensionality than the source, so we need to adjust the headers
-                    headers_new = headers_new[:source_flattened.shape[2]] * source_flattened.shape[3]
+                    headers_new = (
+                        headers_new[: source_flattened.shape[2]] * source_flattened.shape[3]
+                    )
             mv = MedicalVolume(realigned, destination.affine, headers_new)
             return mv
 
@@ -60,11 +66,13 @@ else:
         # seems to be the norm, hence the z_offset is 0
         # z_offset = (other_thickness/other.pixel_spacing[2]/2 - 1/2) #(other_thickness - other.pixel_spacing[2])/2
 
-        shape_as_range = (np.arange(target.shape[0]),
-                          np.arange(target.shape[1]),
-                          np.arange(target.shape[2]) + z_offset)
+        shape_as_range = (
+            np.arange(target.shape[0]),
+            np.arange(target.shape[1]),
+            np.arange(target.shape[2]) + z_offset,
+        )
 
-        coords = np.array(np.meshgrid(*shape_as_range, indexing='ij')).astype(float)
+        coords = np.array(np.meshgrid(*shape_as_range, indexing="ij")).astype(float)
 
         # Add additional dimension with 1 to each coordinate to make work with 4x4 affine matrix
         addon = np.ones([1, coords.shape[1], coords.shape[2], coords.shape[3]])

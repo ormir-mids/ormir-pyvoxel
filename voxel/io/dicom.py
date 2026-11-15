@@ -89,7 +89,7 @@ def _safe_dicom_read(file_path, force=True):
     except pydicom.errors.InvalidDicomError:
         return None
     # check if valid dicom
-    if 'SOPInstanceUID' in d:
+    if "SOPInstanceUID" in d:
         return d
     return None
 
@@ -330,7 +330,9 @@ class DicomReader(DataReader):
             ]
 
         # remove the failed files from the list
-        dicom_slices = list(filter(lambda x: x is not None and hasattr(x, 'pixel_array'), dicom_slices))
+        dicom_slices = list(
+            filter(lambda x: x is not None and hasattr(x, "pixel_array"), dicom_slices)
+        )
 
         # check if the dicom dataset is enhanced
         new_dicom_slices = []
@@ -368,7 +370,9 @@ class DicomReader(DataReader):
 
         dicom_data = {}
         for ds in dicom_slices:
-            val_groupby = tuple(_wrap_as_tuple(_unpack_dicom_attr(ds, attr, required=True)) for attr in group_by)
+            val_groupby = tuple(
+                _wrap_as_tuple(_unpack_dicom_attr(ds, attr, required=True)) for attr in group_by
+            )
 
             if val_groupby not in dicom_data.keys():
                 dicom_data[val_groupby] = {"headers": [], "arr": []}
@@ -733,6 +737,7 @@ def add_dicom_headers(
     Returns:
         MedicalVolume: The medical volume with DICOM headers added.
     """
+
     # Convert inputs xval_yval to XvalYval following pydicom syntax.
     def _split_and_capitalize(x):
         return "".join([s.capitalize() for s in x.split("_")])

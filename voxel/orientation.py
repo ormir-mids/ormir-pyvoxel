@@ -57,6 +57,7 @@ For example,
 For details on how the affine matrix is used for reformatting see
 :class:`voxel.MedicalVolume`.
 """
+
 import warnings
 from typing import List, Sequence, Tuple, Union
 
@@ -380,15 +381,21 @@ def to_RAS_affine(headers: List[pydicom.FileDataset], default_ornt: Tuple[str, s
     # Fallbacks
     if iop is None:
         iop = [1, 0, 0, 0, 1, 0]
-        warnings.warn("Could not determine direction cosines, using LPS+ as a fallback.")
+        warnings.warn(
+            "Could not determine direction cosines, using LPS+ as a fallback.", stacklevel=1
+        )
 
     if in_plane_pixel_spacing is None:
         in_plane_pixel_spacing = [1, 1]
-        warnings.warn("Could not determine in-plane pixel spacing, using [1, 1] as a fallback.")
+        warnings.warn(
+            "Could not determine in-plane pixel spacing, using [1, 1] as a fallback.", stacklevel=1
+        )
 
     if ipp0 is None:
         ipp0 = [0, 0, 0]
-        warnings.warn("Could not determine image position, using [0, 0, 0] as a fallback.")
+        warnings.warn(
+            "Could not determine image position, using [0, 0, 0] as a fallback.", stacklevel=1
+        )
 
     orientation = np.zeros([3, 3])
 
@@ -411,7 +418,9 @@ def to_RAS_affine(headers: List[pydicom.FileDataset], default_ornt: Tuple[str, s
     else:
         if slice_thickness is None:
             slice_thickness = 1.0
-            warnings.warn("Could not determine slice thickness, using 1.0 as a fallback.")
+            warnings.warn(
+                "Could not determine slice thickness, using 1.0 as a fallback.", stacklevel=1
+            )
 
         i_norm = 1 / np.linalg.norm(i_vec) * i_vec
         j_norm = 1 / np.linalg.norm(j_vec) * j_vec
