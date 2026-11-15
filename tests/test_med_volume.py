@@ -172,6 +172,31 @@ class TestMedicalVolume(unittest.TestCase):
         assert mv2.get_metadata("RescaleIntercept", default=None) is None
         assert mv2.dtype == np.float32
 
+    def test_apply_rescale_per_slice(self):
+        volume = np.arange(24, dtype=np.uint16).reshape(2, 4, 3)
+        headers = ututils.build_dummy_headers(3)
+        slopes = (2.0, 0.5, 3.0)
+        intercepts = (-10.0, 4.0, 1.0)
+        for header, slope, intercept in zip(headers, slopes, intercepts):
+            header.RescaleSlope = slope
+            header.RescaleIntercept = intercept
+
+        mv = MedicalVolume(volume, self._AFFINE, headers=headers)
+        result = mv.apply_rescale(dtype=np.float32, sync=True)
+        np.testing.assert_allclose(result.volume[:, :, 0], volume[:, :, 0] * 2.0 - 10.0)
+        np.testing.assert_allclose(result.volume[:, :, 1], volume[:, :, 1] * 0.5 + 4.0)
+        np.testing.assert_allclose(result.volume[:, :, 2], volume[:, :, 2] * 3.0 + 1.0)
+        np.testing.assert_array_equal(mv.volume, volume)
+        for original, rescaled in zip(mv.headers(flatten=True), result.headers(flatten=True)):
+            assert "RescaleSlope" in original and "RescaleIntercept" in original
+            assert "RescaleSlope" not in rescaled and "RescaleIntercept" not in rescaled
+
+        # An explicit value overrides only that field across all slices.
+        overridden = mv.apply_rescale(slope=4, dtype=np.float32, sync=False)
+        np.testing.assert_allclose(overridden.volume, volume * 4 + np.array(intercepts))
+        overridden = mv.apply_rescale(intercept=7, dtype=np.float32, sync=False)
+        np.testing.assert_allclose(overridden.volume, volume * np.array(slopes) + 7)
+
     def test_apply_modality_lut(self):
         ds = pydicom.Dataset()
         lut = pydicom.Dataset()
