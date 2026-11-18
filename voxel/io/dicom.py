@@ -89,7 +89,7 @@ def _safe_dicom_read(file_path, force=True):
     except pydicom.errors.InvalidDicomError:
         return None
     # check if valid dicom
-    if 'SOPInstanceUID' in d:
+    if "SOPInstanceUID" in d:
         return d
     return None
 
@@ -137,6 +137,7 @@ class DicomReader(DataReader):
         sort_by: Union[str, int, Sequence[Union[str, int]]] = None,
         ignore_ext: bool = False,
         default_ornt: Tuple[str, str] = None,
+        group_by_tol: float = 1e-5,
     ):
         """
         Args:
@@ -153,6 +154,9 @@ class DicomReader(DataReader):
             default_ornt (Tuple[str, str], optional): Default in-plane orientation to use if
                 orientation cannot be determined from DICOM header. If not specified
                 and orientation cannot be determined, error will be raised.
+            group_by_tol (float, optional): Absolute tolerance used when comparing
+                floating point ``group_by`` values (e.g. ImageOrientationPatient).
+                Non-float values are compared exactly.
         """
         self.num_workers = num_workers
         self.verbose = verbose
@@ -160,6 +164,7 @@ class DicomReader(DataReader):
         self.sort_by = sort_by
         self.ignore_ext = ignore_ext
         self.default_ornt = default_ornt
+        self.group_by_tol = group_by_tol
 
     def get_files(
         self,
@@ -259,6 +264,7 @@ class DicomReader(DataReader):
         sort_by: Union[str, int, Sequence[Union[str, int]]] = np._NoValue,
         ignore_ext: bool = np._NoValue,
         default_ornt: Tuple[str, str] = np._NoValue,
+        group_by_tol: float = np._NoValue,
     ):
         """Load dicoms into ``MedicalVolume``s grouped by ``group_by`` tag(s).
 
@@ -282,6 +288,9 @@ class DicomReader(DataReader):
                 orientation cannot be determined from DICOM header. If not specified
                 and orientation cannot be determined, error will be raised.
                 Defaults to ``self.default_ornt``.
+            group_by_tol (float, optional): Absolute tolerance used when comparing
+                floating point ``group_by`` values (e.g. ImageOrientationPatient).
+                Non-float values are compared exactly. Defaults to ``self.group_by_tol``.
 
         Returns:
             Union[List[MedicalVolume], MedicalVolume]: Different volumes grouped by the
@@ -301,6 +310,7 @@ class DicomReader(DataReader):
         sort_by = sort_by if sort_by != np._NoValue else self.sort_by
         ignore_ext = ignore_ext if ignore_ext != np._NoValue else self.ignore_ext
         default_ornt = default_ornt if default_ornt != np._NoValue else self.default_ornt
+        group_by_tol = group_by_tol if group_by_tol != np._NoValue else self.group_by_tol
 
         group_by = _wrap_as_tuple(group_by, default=())
         sort_by = _wrap_as_tuple(sort_by, default=())
@@ -330,7 +340,9 @@ class DicomReader(DataReader):
             ]
 
         # remove the failed files from the list
-        dicom_slices = list(filter(lambda x: x is not None and hasattr(x, 'pixel_array'), dicom_slices))
+        dicom_slices = list(
+            filter(lambda x: x is not None and hasattr(x, "pixel_array"), dicom_slices)
+        )
 
         # check if the dicom dataset is enhanced
         new_dicom_slices = []
@@ -368,13 +380,21 @@ class DicomReader(DataReader):
 
         dicom_data = {}
         for ds in dicom_slices:
-            val_groupby = tuple(_wrap_as_tuple(_unpack_dicom_attr(ds, attr, required=True)) for attr in group_by)
+            val_groupby = tuple(
+                _wrap_as_tuple(_unpack_dicom_attr(ds, attr, required=True)) for attr in group_by
+            )
 
-            if val_groupby not in dicom_data.keys():
-                dicom_data[val_groupby] = {"headers": [], "arr": []}
+            # Match against existing groups with tolerance to handle floating point noise.
+            key = next(
+                (k for k in dicom_data if _group_values_match(k, val_groupby, group_by_tol)),
+                val_groupby,
+            )
 
-            dicom_data[val_groupby]["headers"].append(ds)
-            dicom_data[val_groupby]["arr"].append(ds.pixel_array)
+            if key not in dicom_data:
+                dicom_data[key] = {"headers": [], "arr": []}
+
+            dicom_data[key]["headers"].append(ds)
+            dicom_data[key]["arr"].append(ds.pixel_array)
 
         vols = []
         for k in sorted(dicom_data.keys()):
@@ -382,6 +402,7 @@ class DicomReader(DataReader):
             headers = dd["headers"]
             if len(headers) == 0:
                 continue
+            _harmonize_group_attrs(headers, group_by)
             arr = np.stack(dd["arr"], axis=-1)
 
             affine = stdo.to_RAS_affine(headers, default_ornt=default_ornt)
@@ -683,6 +704,37 @@ def _update_np_dtype(arr: np.ndarray, bit_depth: int):
     return arr.astype(new_dtype)
 
 
+def _group_values_match(a, b, tol: float) -> bool:
+    """Check if two group-by values are equal, comparing floats with absolute tolerance ``tol``.
+
+    Sequences are compared element-wise. Non-float values (e.g. ints, strings) are
+    compared exactly.
+    """
+    if isinstance(a, Sequence) and not isinstance(a, str):
+        if not isinstance(b, Sequence) or isinstance(b, str) or len(a) != len(b):
+            return False
+        return all(_group_values_match(x, y, tol) for x, y in zip(a, b))
+    if isinstance(a, float) or isinstance(b, float):  # pydicom DSfloat subclasses float
+        try:
+            return abs(float(a) - float(b)) <= tol
+        except (TypeError, ValueError):
+            return False
+    return a == b
+
+
+def _harmonize_group_attrs(headers, group_by):
+    """Set ``group_by`` attributes of all headers to the value of the first header.
+
+    Slices are grouped with a tolerance, so values (e.g. ImageOrientationPatient) may
+    differ slightly between slices in the same group. This makes them identical.
+    """
+    for attr in group_by:
+        ref = headers[0][attr].value
+        for h in headers[1:]:
+            if h[attr].value != ref:
+                h[attr].value = copy.deepcopy(ref)
+
+
 def _unpack_dicom_attr(header, attr, required=False):
     if not required:
         val = header.get(attr)
@@ -733,6 +785,7 @@ def add_dicom_headers(
     Returns:
         MedicalVolume: The medical volume with DICOM headers added.
     """
+
     # Convert inputs xval_yval to XvalYval following pydicom syntax.
     def _split_and_capitalize(x):
         return "".join([s.capitalize() for s in x.split("_")])
@@ -825,6 +878,9 @@ def add_dicom_headers(
                 print(f"Failed to set {k} to {v}: {e}")
                 raise e
 
+        header.SOPClassUID = header.file_meta.MediaStorageSOPClassUID
+        header.SOPInstanceUID = header.file_meta.MediaStorageSOPInstanceUID
+
         header.is_little_endian = True
         header.is_implicit_VR = False
 
@@ -885,7 +941,7 @@ def _get_per_slice_metadata(affine, num_slices: int) -> List[Dict[str, Any]]:
             if isinstance(v, np.ndarray):
                 v = v.flatten()
             if isinstance(v, (np.ndarray, list, tuple)):
-                dtype = int if v[0].dtype in (np.int, np.int16, np.int32, np.int64) else float
+                dtype = int if v[0].dtype in (int, np.int16, np.int32, np.int64) else float
                 md[k] = [dtype(x) for x in v]
 
     return metadatas

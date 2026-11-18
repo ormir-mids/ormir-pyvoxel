@@ -18,7 +18,7 @@ def package_available(name: str):
     Returns:
         bool: Whether module exists in environment.
     """
-    global _SUPPORTED_PACKAGES
+    global _SUPPORTED_PACKAGES  # noqa: F824
     if name not in _SUPPORTED_PACKAGES:
         _SUPPORTED_PACKAGES[name] = util.find_spec(name) is not None
     return _SUPPORTED_PACKAGES[name]

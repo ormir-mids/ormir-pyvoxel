@@ -1,4 +1,5 @@
 """Utilities for medical image I/O."""
+
 import os
 from pathlib import Path
 from typing import List, Union

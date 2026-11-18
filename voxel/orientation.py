@@ -57,14 +57,13 @@ For example,
 For details on how the affine matrix is used for reformatting see
 :class:`voxel.MedicalVolume`.
 """
+
 import warnings
 from typing import List, Sequence, Tuple, Union
 
 import nibabel.orientations as nibo
 import numpy as np
 import pydicom
-
-import voxel as vx
 
 __all__ = [
     "to_affine",
@@ -380,51 +379,69 @@ def to_RAS_affine(headers: List[pydicom.FileDataset], default_ornt: Tuple[str, s
     # Fallbacks
     if iop is None:
         iop = [1, 0, 0, 0, 1, 0]
-        warnings.warn("Could not determine direction cosines, using LPS+ as a fallback.")
+        warnings.warn(
+            "Could not determine direction cosines, using LPS+ as a fallback.", stacklevel=1
+        )
 
     if in_plane_pixel_spacing is None:
         in_plane_pixel_spacing = [1, 1]
-        warnings.warn("Could not determine in-plane pixel spacing, using [1, 1] as a fallback.")
+        warnings.warn(
+            "Could not determine in-plane pixel spacing, using [1, 1] as a fallback.", stacklevel=1
+        )
 
     if ipp0 is None:
         ipp0 = [0, 0, 0]
-        warnings.warn("Could not determine image position, using [0, 0, 0] as a fallback.")
+        warnings.warn(
+            "Could not determine image position, using [0, 0, 0] as a fallback.", stacklevel=1
+        )
 
     orientation = np.zeros([3, 3])
 
     # Determine vector for in-plane pixel directions (i, j).
-    i_vec, j_vec = np.asarray(iop[:3]).astype(np.float64), np.asarray(iop[3:]).astype(np.float64)
-    i_vec, j_vec = (
-        np.round(i_vec, vx.config.affine_precision),
-        np.round(j_vec, vx.config.affine_precision),
-    )
-    i_vec = i_vec * in_plane_pixel_spacing[0]
-    j_vec = j_vec * in_plane_pixel_spacing[1]
+    i_vec = np.asarray(iop[:3], dtype=np.float64)
+    j_vec = np.asarray(iop[3:], dtype=np.float64)
+
+    # Normalize and orthogonalize to avoid numerical errors.
+    i_vec /= np.linalg.norm(i_vec)
+    j_vec -= np.dot(j_vec, i_vec) * i_vec
+    j_vec /= np.linalg.norm(j_vec)
+
+    i_vec *= float(in_plane_pixel_spacing[0])
+    j_vec *= float(in_plane_pixel_spacing[1])
 
     # Determine vector for through-plane pixel direction (k).
-    # Compute difference in patient position between consecutive headers.
-    # This is the preferred method to determine the k vector.
-    # If single header, take cross product between i/j vectors.
-    # These actions are done to avoid rounding errors that might result from float subtraction.
+    i_norm = i_vec / np.linalg.norm(i_vec)
+    j_norm = j_vec / np.linalg.norm(j_vec)
+    k_norm = np.cross(i_norm, j_norm)
+    k_norm /= np.linalg.norm(k_norm)
+
     if ipp1 is not None and ipp1 != ipp0:
-        k_vec = np.asarray(ipp1).astype(np.float64) - np.asarray(ipp0).astype(np.float64)
+        displacement = np.asarray(ipp1, dtype=np.float64) - np.asarray(ipp0, dtype=np.float64)
+
+        measured_spacing = np.dot(displacement, k_norm)
+
+        # Prefer DICOM slice spacing when available.
+        if slice_spacing is not None and abs(float(slice_spacing)) > 1e-8:
+            spacing = abs(float(slice_spacing))
+            spacing *= np.sign(measured_spacing) if abs(measured_spacing) > 1e-8 else 1
+        else:
+            spacing = measured_spacing
+
+        k_vec = k_norm * spacing
     else:
         if slice_thickness is None:
             slice_thickness = 1.0
-            warnings.warn("Could not determine slice thickness, using 1.0 as a fallback.")
+            warnings.warn(
+                "Could not determine slice thickness, using 1.0 as a fallback.", stacklevel=1
+            )
 
-        i_norm = 1 / np.linalg.norm(i_vec) * i_vec
-        j_norm = 1 / np.linalg.norm(j_vec) * j_vec
-        k_norm = np.cross(i_norm, j_norm)
-        k_vec = k_norm / np.linalg.norm(k_norm) * slice_thickness
-        if isinstance(slice_spacing, (int, float)) and slice_spacing < 0:
+        k_vec = k_norm * float(slice_thickness)
+
+        if slice_spacing is not None and float(slice_spacing) < 0:
             k_vec *= -1
 
-    k_vec = np.round(k_vec, vx.config.affine_precision)
-
     orientation[:3, :3] = np.stack([j_vec, i_vec, k_vec], axis=1)
-    scanner_origin = np.asarray(ipp0).astype(np.float64)
-    scanner_origin = np.round(scanner_origin, vx.config.affine_precision)
+    scanner_origin = np.asarray(ipp0, dtype=np.float64)
 
     affine = np.zeros([4, 4])
     affine[:3, :3] = orientation

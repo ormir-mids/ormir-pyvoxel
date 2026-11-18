@@ -2,13 +2,14 @@
 
 This module defines :class:`MedicalVolume`, which is a wrapper for nD volumes.
 """
+
 from __future__ import annotations
 
 import warnings
 from copy import deepcopy
 from mmap import mmap
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Dict, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Union
 
 import nibabel as nib
 import numpy as np
@@ -304,7 +305,9 @@ class MedicalVolume(NDArrayOperatorsMixin):
         """
         return self.reformat(other.orientation, inplace=inplace)
 
-    def realign_as(self, other, interpolation_order: int = 3, inplace: bool = False) -> "MedicalVolume":
+    def realign_as(
+        self, other, interpolation_order: int = 3, inplace: bool = False
+    ) -> "MedicalVolume":
         """Realign this volume to the image space of another volume.
 
         Similar to ``reformat_as``, except that it supports fine rotations, translations,
@@ -440,6 +443,7 @@ class MedicalVolume(NDArrayOperatorsMixin):
             "`match_orientation` is deprecated and will be removed in v0.1. "
             "Use `mv.reformat_as(self, inplace=True)` instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         if not isinstance(mv, MedicalVolume):
             raise TypeError("`mv` must be a MedicalVolume.")
@@ -456,6 +460,7 @@ class MedicalVolume(NDArrayOperatorsMixin):
             "`match_orientation_batch` is deprecated and will be removed in v0.1. "
             "Use `[x.reformat_as(self, inplace=True) for x in mvs]` instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         for mv in mvs:
             self.match_orientation(mv)
@@ -827,7 +832,8 @@ class MedicalVolume(NDArrayOperatorsMixin):
             self._headers = self._validate_and_format_headers([pydicom.Dataset()])
             warnings.warn(
                 "Headers were generated and may not contain all attributes "
-                "required to save the volume in DICOM format."
+                "required to save the volume in DICOM format.",
+                stacklevel=2,
             )
 
         VR_registry = {float: "DS", int: "IS", str: "LS"}
@@ -869,12 +875,41 @@ class MedicalVolume(NDArrayOperatorsMixin):
         mv = self if inplace else self.clone()
         mv = mv.astype(np.dtype(dtype), copy=False)
 
-        h: pydicom.Dataset = self._headers.flat[0]
-        rs = float(h.get("RescaleSlope", 1)) if slope is None else slope
-        ri = float(h.get("RescaleIntercept", 0)) if intercept is None else intercept
-        apply_rescale(mv._volume, rs, ri, inplace=True)
+        if mv._headers is None:
+            apply_rescale(mv._volume, slope, intercept, inplace=True)
+        else:
+            # Headers are aligned with the volume and may have singleton
+            # dimensions for axes shared by multiple pixels.
+            headers = mv._headers
 
-        if sync:
+            headers = mv._headers
+
+            if headers.ndim > mv._volume.ndim:
+                raise ValueError("Headers have more dimensions than the volume")
+
+            header_shape = headers.shape + (1,) * (mv._volume.ndim - headers.ndim)
+
+            if any(h != 1 and h != v for h, v in zip(header_shape, mv._volume.shape)):
+                raise ValueError(
+                    "Header dimensions must be singleton or match "
+                    "the corresponding volume dimensions"
+                )
+
+            for index in np.ndindex(headers.shape):
+                h: pydicom.Dataset = headers[index]
+                rs = float(h.get("RescaleSlope", 1)) if slope is None else slope
+                ri = float(h.get("RescaleIntercept", 0)) if intercept is None else intercept
+
+                # Use slices rather than integer indices so the selected
+                # region remains a writable view of the original array.
+                region = tuple(
+                    slice(None) if size == 1 else slice(i, i + 1)
+                    for i, size in zip(index, headers.shape)
+                )
+                region += (slice(None),) * (mv._volume.ndim - len(region))
+                apply_rescale(mv._volume[region], rs, ri, inplace=True)
+
+        if sync and mv._headers is not None:
             mv._delete_metadata("RescaleSlope")
             mv._delete_metadata("RescaleIntercept")
 
@@ -1754,8 +1789,10 @@ class MedicalVolume(NDArrayOperatorsMixin):
         )
 
     def __tunnelvision__(
-        self, config: Dict[str, Any] = {}, **kwargs
+        self, config: Optional[Dict[str, Any]] = None, **kwargs
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        if config is None:
+            config = {}
         # Only 3D and 5D volumes are supported, as we want to "reformat" for tunnelvision for now
         if self._volume.ndim not in [3, 5]:
             raise ValueError("Ambiguous dims: reshape to [BxZxYxXxC] or a permutation of [ZxYxX]")

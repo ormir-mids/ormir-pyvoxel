@@ -1,4 +1,5 @@
 """Functions and classes for getting and setting computing devices."""
+
 import numpy as np
 
 from voxel.utils import env

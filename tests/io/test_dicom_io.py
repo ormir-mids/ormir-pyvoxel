@@ -458,7 +458,7 @@ class TestDicomIO(ututils.TempPathMixin):
     def test_sample_pydicom_data(self):
         """Test DICOM reader with sample pydicom data."""
         filepath = get_testdata_file("MR_small.dcm")
-        mv_pydicom = pydicom.read_file(filepath)
+        mv_pydicom = pydicom.dcmread(filepath)
         arr = mv_pydicom.pixel_array
 
         dr = DicomReader(group_by=None)
@@ -471,9 +471,42 @@ class TestDicomIO(ututils.TempPathMixin):
         out_path = os.path.join(out_dir, "I0001.dcm")
         dw(mv, dir_path=out_dir)
 
-        mv_pydicom_loaded = pydicom.read_file(out_path)
+        mv_pydicom_loaded = pydicom.dcmread(out_path)
         assert np.all(mv_pydicom_loaded.pixel_array == arr)
         assert self.are_equivalent_headers(mv_pydicom_loaded, mv_pydicom)
+
+    def test_group_by_image_orientation_with_tolerance(self):
+        orientations = [
+            [0.000181627, 0.999883, -0.0152699, 0.0119057, -0.0152711, -0.999813],
+            [0.000181631, 0.999883, -0.01527, 0.0119057, -0.0152711, -0.999813],
+            [0.000181632, 0.999883, -0.01527, 0.0119057, -0.0152711, -0.999813],
+            [0.000181634, 0.999883, -0.01527, 0.0119057, -0.0152711, -0.999813],
+            [0.000181634, 0.999883, -0.0152699, 0.0119057, -0.0152711, -0.999813],
+        ]
+        dataset = pydicom.dcmread(get_testdata_file("MR_small.dcm"))
+        pixels = dataset.pixel_array.copy()
+        paths = []
+        for i, orientation in enumerate(orientations):
+            dataset.ImageOrientationPatient = orientation
+            dataset.ImagePositionPatient = [i, 0, 0]
+            dataset.PixelData = (pixels + i).astype(pixels.dtype).tobytes()
+            path = self.data_dirpath / f"orientation_{i}.dcm"
+            dataset.save_as(path)
+            paths.append(path)
+
+        reader = DicomReader()
+        volumes = reader.load(paths, group_by=["ImageOrientationPatient"])
+        assert len(volumes) == 1
+        assert volumes[0].shape == pixels.shape + (len(orientations),)
+        for i in range(len(orientations)):
+            np.testing.assert_array_equal(volumes[0].volume[:, :, i], pixels + i)
+        for header in volumes[0].headers(flatten=True):
+            np.testing.assert_allclose(
+                header.ImageOrientationPatient, orientations[0], atol=0, rtol=0
+            )
+
+        # Without tolerance, each distinct orientation forms a separate volume.
+        assert len(reader.load(paths, group_by=["ImageOrientationPatient"], group_by_tol=0)) == 5
 
     def test_load_pydicom_data(self):
         filepath = get_testdata_file("MR_small.dcm")
